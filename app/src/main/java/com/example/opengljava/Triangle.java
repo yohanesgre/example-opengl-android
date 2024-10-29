@@ -119,19 +119,17 @@ public class Triangle {
 
         mvpMatrixHandle = GLES20.glGetUniformLocation(mProgram, "uMVPMatrix");
 
-        // Apply scaling and translation
-        float[] scratch = new float[16];
-        float[] scaleMatrix = new float[16];
-        Matrix.setIdentityM(scaleMatrix, 0);
-        Matrix.scaleM(scaleMatrix, 0, 2f, 2f, 0f);
-        Matrix.multiplyMM(scratch, 0, mvpMatrix, 0, scaleMatrix, 0);
-        Matrix.translateM(scratch, 0, 0f, -0.15f, 0f);
+        Matrix.scaleM(mvpMatrix, 0, 2f, 2f, 0f);
+        // Log the scaled matrix
+        printMatrix("Final Scaled Matrix", mvpMatrix);
 
-        // Log the final transformed matrix
-        printMatrix("Final Transformed Matrix", scratch);
+        // Apply scaling and translation
+        Matrix.translateM(mvpMatrix, 0, 0f, -0.15f, 0f);
+        // Log the translated matrix
+        printMatrix("Final Translated Matrix", mvpMatrix);
 
         // Apply the projection and view transformation
-        GLES20.glUniformMatrix4fv(mvpMatrixHandle, 1, false, scratch, 0);
+        GLES20.glUniformMatrix4fv(mvpMatrixHandle, 1, false, mvpMatrix, 0);
 
         // Draw the triangle
         GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, vertexCount);
