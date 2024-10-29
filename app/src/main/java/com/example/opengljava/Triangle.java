@@ -2,12 +2,15 @@ package com.example.opengljava;
 
 import android.opengl.GLES20;
 import android.opengl.Matrix;
+import android.util.Log;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 
 public class Triangle {
+    private static final String TAG = "Triangle"; // Tag for logging
+
     private final String vertexShaderCode =
             "uniform mat4 uMVPMatrix;" +
                     "attribute vec4 vPosition;" +
@@ -46,14 +49,26 @@ public class Triangle {
             0.2887f, 0f, 0.0f      // bottom right
     };
 
-    // Updated UV coordinates for proper barycentric interpolation
     static float[] uvCords = {
-            0.0f, 0.0f,    // top (corresponds to first barycentric coordinate)
-            1.0f, 0.0f,    // bottom left (corresponds to second barycentric coordinate)
-            0.0f, 1.0f     // bottom right (corresponds to third barycentric coordinate)
+            0.0f, 0.0f,    // top
+            1.0f, 0.0f,    // bottom left
+            0.0f, 1.0f     // bottom right
     };
 
     private final int mProgram;
+
+    // Helper method to print matrix
+    private void printMatrix(String label, float[] matrix) {
+        StringBuilder sb = new StringBuilder(label + ":\n");
+        for (int i = 0; i < 4; i++) {
+            sb.append("[ ");
+            for (int j = 0; j < 4; j++) {
+                sb.append(String.format("%.4f ", matrix[i * 4 + j]));
+            }
+            sb.append("]\n");
+        }
+        Log.d(TAG, sb.toString());
+    }
 
     public Triangle() {
         // Initialize vertex byte buffer for shape coordinates
@@ -87,21 +102,21 @@ public class Triangle {
     private final int vertexStride = COORDS_PER_VERTEX * 4;
 
     public void draw(float[] mvpMatrix) {
+        // Log the input MVP matrix
+        printMatrix("Input MVP Matrix", mvpMatrix);
+
         GLES20.glUseProgram(mProgram);
 
-        // Get handle to vertex shader's vPosition member
         positionHandle = GLES20.glGetAttribLocation(mProgram, "vPosition");
         GLES20.glEnableVertexAttribArray(positionHandle);
         GLES20.glVertexAttribPointer(positionHandle, COORDS_PER_VERTEX,
                 GLES20.GL_FLOAT, false, vertexStride, vertexBuffer);
 
-        // Get handle to vertex shader's texCoord member
         texCoordHandle = GLES20.glGetAttribLocation(mProgram, "texCoord");
         GLES20.glEnableVertexAttribArray(texCoordHandle);
         GLES20.glVertexAttribPointer(texCoordHandle, 2,
                 GLES20.GL_FLOAT, false, 0, texCoordBuffer);
 
-        // Get handle to shape's transformation matrix
         mvpMatrixHandle = GLES20.glGetUniformLocation(mProgram, "uMVPMatrix");
 
         // Apply scaling and translation
@@ -111,6 +126,9 @@ public class Triangle {
         Matrix.scaleM(scaleMatrix, 0, 2f, 2f, 0f);
         Matrix.multiplyMM(scratch, 0, mvpMatrix, 0, scaleMatrix, 0);
         Matrix.translateM(scratch, 0, 0f, -0.15f, 0f);
+
+        // Log the final transformed matrix
+        printMatrix("Final Transformed Matrix", scratch);
 
         // Apply the projection and view transformation
         GLES20.glUniformMatrix4fv(mvpMatrixHandle, 1, false, scratch, 0);
