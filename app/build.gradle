@@ -14,9 +14,37 @@ android {
         versionName "1.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+
+        // Specify CMake configuration
+        externalNativeBuild {
+            cmake {
+                cppFlags '-std=c++14'
+                arguments "-DANDROID_STL=c++_shared"
+            }
+        }
     }
 
     buildTypes {
+        debug {
+            // Enable debug symbols for native code
+            ndk {
+                // FULL includes all debug symbols
+                debugSymbolLevel 'FULL'
+
+                // You can also specify ABIs to debug
+                abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86', 'x86_64'
+            }
+
+            // Disable minification for easier debugging
+            minifyEnabled false
+
+            // Enable debugging for JNI code
+            jniDebuggable true
+
+            // Enable debugging for renderscript
+            renderscriptDebuggable true
+        }
+
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
@@ -25,6 +53,21 @@ android {
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_11
         targetCompatibility JavaVersion.VERSION_11
+    }
+
+    // Configure CMake build
+    externalNativeBuild {
+        cmake {
+            path "src/main/cpp/CMakeLists.txt"
+            version "3.22.1"
+        }
+    }
+
+    // Copy shader files to assets
+    sourceSets {
+        main {
+            assets.srcDirs = ['src/main/assets', 'src/main/shaders']
+        }
     }
 }
 
@@ -37,3 +80,4 @@ dependencies {
     androidTestImplementation libs.ext.junit
     androidTestImplementation libs.espresso.core
 }
+
