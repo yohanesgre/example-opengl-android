@@ -24,7 +24,7 @@ public class NativeGLSurfaceView extends GLSurfaceView {
             setRenderer(renderer);
 
             // Render continuously
-            setRenderMode(GLSurfaceView.RENDERMODE_WHEN_DIRTY);
+            setRenderMode(GLSurfaceView.RENDERMODE_CONTINUOUSLY);
 
             Log.i(TAG, "GLSurfaceView setup complete");
         } catch (Exception e) {

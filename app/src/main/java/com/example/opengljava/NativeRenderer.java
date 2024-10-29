@@ -19,9 +19,16 @@ public class NativeRenderer {
     public native void init();
     public native void setupView(int width, int height);
     public native void cleanup();
-    public native void drawShape(float[] vertices, float[] texCoords,
-                                 float[] modelMatrix,
-                                 String vertexShader, String fragmentShader);
+    public native void drawShape(
+            float[] vertices,
+            float[] texCoords,
+            float[] modelMatrix,
+            String vertexShader,
+            String fragmentShader,
+            float scaleX, float scaleY, float scaleZ,
+            float rotationAngle,
+            float rotationX, float rotationY, float rotationZ
+    );
 
     public void initialize() {
         try {
@@ -47,6 +54,11 @@ public class NativeRenderer {
             String vertexShader = shape.getVertexShaderPath();
             String fragmentShader = shape.getFragmentShaderPath();
 
+            // Get transformation parameters
+            float[] scale = shape.getScale();
+            float rotationAngle = shape.getRotationAngle();
+            float[] rotationAxis = shape.getRotationAxis();
+
             // Validate inputs
             if (vertices == null || vertices.length == 0) {
                 throw new IllegalArgumentException("Invalid vertices data");
@@ -63,8 +75,29 @@ public class NativeRenderer {
             if (fragmentShader == null || fragmentShader.isEmpty()) {
                 throw new IllegalArgumentException("Invalid fragment shader path");
             }
+            if (scale == null || scale.length != 3) {
+                throw new IllegalArgumentException("Invalid scale values");
+            }
+            if (rotationAxis == null || rotationAxis.length != 3) {
+                throw new IllegalArgumentException("Invalid rotation axis");
+            }
 
-            drawShape(vertices, texCoords, modelMatrix, vertexShader, fragmentShader);
+            // Log transformation parameters for debugging
+            Log.d(TAG, String.format("Rendering shape with scale (%.2f, %.2f, %.2f)",
+                    scale[0], scale[1], scale[2]));
+            Log.d(TAG, String.format("Rotation: %.2f degrees around axis (%.2f, %.2f, %.2f)",
+                    rotationAngle, rotationAxis[0], rotationAxis[1], rotationAxis[2]));
+
+            drawShape(
+                    vertices,
+                    texCoords,
+                    modelMatrix,
+                    vertexShader,
+                    fragmentShader,
+                    scale[0], scale[1], scale[2],
+                    rotationAngle,
+                    rotationAxis[0], rotationAxis[1], rotationAxis[2]
+            );
         } catch (Exception e) {
             Log.e(TAG, "Error rendering shape", e);
             throw new RuntimeException("Failed to render shape", e);

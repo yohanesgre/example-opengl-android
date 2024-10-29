@@ -12,7 +12,6 @@ public class NativeGLRenderer implements GLSurfaceView.Renderer {
     private static final String TAG = "NativeGLRenderer";
     private final NativeRenderer nativeRenderer;
     private final Triangle triangle;
-    private final float[] modelMatrix = new float[16];
     private boolean isInitialized = false;
 
     public NativeGLRenderer(NativeRenderer nativeRenderer) {
@@ -20,7 +19,7 @@ public class NativeGLRenderer implements GLSurfaceView.Renderer {
             throw new IllegalArgumentException("NativeRenderer cannot be null");
         }
         this.nativeRenderer = nativeRenderer;
-        this.triangle = new Triangle();
+        this.triangle = new Triangle.Builder().scale(1f,1f, 1f).build();
         Log.i(TAG, "NativeGLRenderer created");
     }
 
@@ -64,14 +63,7 @@ public class NativeGLRenderer implements GLSurfaceView.Renderer {
             long time = SystemClock.uptimeMillis() % 4000L;
             float angle = 0.090f * ((int) time);
 
-            // Create rotation matrix
-            Matrix.setIdentityM(modelMatrix, 0);
-//            Matrix.rotateM(modelMatrix, 0, angle, 0, 0, -1.0f);
-//            Matrix.scaleM(modelMatrix, 0, 2.0f, 2.0f, 1.0f);
-//            Matrix.translateM(modelMatrix, 0, 0f, -0.15f, 0f);
-
-            // Update the triangle's model matrix
-            triangle.setModelMatrix(modelMatrix);
+            triangle.setRotationZ(angle);
 
             // Draw using native renderer
             nativeRenderer.render(triangle);

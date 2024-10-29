@@ -1,20 +1,18 @@
-// gl_renderer.cpp
 #include "include/gl_renderer.h"
-#include "include/matrix.h"
 #include <fstream>
 #include <sstream>
 #include <android/log.h>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <glm/gtx/string_cast.hpp>
 
 #define LOG_TAG "NativeRenderer"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
-static void logMatrix(const char* name, const float* m) {
-    LOGI("Matrix %s:", name);
-    for (int i = 0; i < 4; i++) {
-        LOGI("Row %d: %.2f, %.2f, %.2f, %.2f",
-             i, m[i*4], m[i*4+1], m[i*4+2], m[i*4+3]);
-    }
+static void logMatrix(const char* name, const glm::mat4& m) {
+    std::string matStr = glm::to_string(m);
+    LOGI("Matrix %s:\n%s", name, matStr.c_str());
 }
 
 void checkShaderCompileStatus(GLuint shader) {
@@ -41,10 +39,10 @@ void Renderer::init() {
     glEnable(GL_DEPTH_TEST);
     glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
 
-    // Initialize matrices
-    Matrix::setIdentityM(projectionMatrix, 0);
-    Matrix::setIdentityM(viewMatrix, 0);
-    Matrix::setIdentityM(mvpMatrix, 0);
+    // Initialize matrices using GLM identity
+    projectionMatrix = glm::mat4(1.0f);
+    viewMatrix = glm::mat4(1.0f);
+    mvpMatrix = glm::mat4(1.0f);
 
     logMatrix("Initial Projection", projectionMatrix);
     logMatrix("Initial View", viewMatrix);
@@ -124,57 +122,40 @@ GLuint Renderer::getOrCreateShaderProgram(const std::string& vertexPath,
 
 void Renderer::setupView(int width, int height) {
     glViewport(0, 0, width, height);
-    float ratio = (float)height / width;
+    float aspectRatio = static_cast<float>(width) / static_cast<float>(height);
 
-    LOGI("Setting up view with dimensions: %dx%d, ratio: %f", width, height, ratio);
+    LOGI("Setting up view with dimensions: %dx%d, aspect ratio: %f",
+         width, height, aspectRatio);
 
-    // Use a closer near plane and adjusted far plane
-    const float near = 5.0f;
-    const float far = 10.0f;
-    const float left = -1.0f;
-    const float right = 1.0f;
-    const float bottom = -ratio;
-    const float top = ratio;
+    // Create perspective projection matrix
+    float fovY = glm::radians(45.0f);
+    float nearPlane = 0.1f;
+    float farPlane = 100.0f;
+    projectionMatrix = glm::perspective(fovY, aspectRatio, nearPlane, farPlane);
+    logMatrix("Projection Matrix", projectionMatrix);
 
-    // Create projection matrix
-    Matrix::frustumM(projectionMatrix, 0,
-                     left, right,
-                     bottom, top,
-                     near, far);
+    // Setup camera view matrix
+    glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 20.0f);
+    glm::vec3 cameraTarget = glm::vec3(0.0f, 0.0f, 0.0f);
+    glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
+    viewMatrix = glm::lookAt(cameraPos, cameraTarget, cameraUp);
+    logMatrix("View Matrix", viewMatrix);
 
-    logMatrix("Projection after frustum", projectionMatrix);
-
-    // Position camera slightly back and up for better view
-    const float eyeX = 0.0f;
-    const float eyeY = 0.0f;
-    const float eyeZ = 5.0f;  // Moved closer
-    const float lookX = 0.0f;
-    const float lookY = 0.0f;
-    const float lookZ = 0.0f;
-    const float upX = 0.0f;
-    const float upY = 1.0f;
-    const float upZ = 0.0f;
-
-    // Create view matrix
-    Matrix::setLookAtM(viewMatrix, 0,
-                       eyeX, eyeY, eyeZ,
-                       lookX, lookY, lookZ,
-                       upX, upY, upZ);
-
-    logMatrix("View after lookAt", viewMatrix);
-
-    // Calculate view-projection matrix
-    Matrix::multiplyMM(mvpMatrix, 0, projectionMatrix, 0, viewMatrix, 0);
-
-    logMatrix("MVP after projection * view", mvpMatrix);
+    // Compute view-projection matrix
+    mvpMatrix = projectionMatrix * viewMatrix;
+    logMatrix("MVP Matrix", mvpMatrix);
 }
 
 void Renderer::drawShape(const std::string& programName,
                          const float* vertices, int vertexCount,
                          const float* texCoords,
-                         const float* modelMatrix) {
+                         const float* modelMatrix,
+                         float scaleX, float scaleY, float scaleZ,
+                         float rotationAngle, float rotationX, float rotationY, float rotationZ) {
     LOGI("Drawing shape with %d vertices", vertexCount);
-    logMatrix("Input Model Matrix", modelMatrix);
+    LOGI("Scale: (%.2f, %.2f, %.2f)", scaleX, scaleY, scaleZ);
+    LOGI("Rotation: %.2f degrees around (%.2f, %.2f, %.2f)",
+         rotationAngle, rotationX, rotationY, rotationZ);
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -191,36 +172,60 @@ void Renderer::drawShape(const std::string& programName,
         return;
     }
 
+    // Calculate the center of the shape
+    glm::vec3 center(0.0f);
+    for (int i = 0; i < vertexCount * 3; i += 3) {
+        center.x += vertices[i];
+        center.y += vertices[i + 1];
+        center.z += vertices[i + 2];
+    }
+    center /= static_cast<float>(vertexCount);
+
+    // Build model matrix using GLM
+    glm::mat4 model = glm::mat4(1.0f);
+
+    // Extract translation from input model matrix
+    glm::vec3 translation(modelMatrix[12], modelMatrix[13], modelMatrix[14]);
+
+    // Order of transformations:
+    // 1. Translate to origin (center)
+    // 2. Rotate
+    // 3. Scale
+    // 4. Translate back
+    model = glm::translate(model, translation);                                    // Final position
+    model = glm::translate(model, center);                                        // Move back from origin
+    model = glm::scale(model, glm::vec3(scaleX, scaleY, scaleZ));               // Apply scale
+    model = glm::rotate(model,
+                        glm::radians(rotationAngle),
+                        glm::normalize(glm::vec3(rotationX, rotationY, rotationZ))); // Apply rotation
+    model = glm::translate(model, -center);                                       // Move to origin
+
+    logMatrix("Model Matrix", model);
+
+    // Calculate final MVP matrix
+    glm::mat4 finalMVP = mvpMatrix * model;
+    logMatrix("Final MVP Matrix", finalMVP);
+
     // Set up vertex buffers
     GLuint vbo[2];
     glGenBuffers(2, vbo);
 
     // Upload vertex data
     glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
-    glBufferData(GL_ARRAY_BUFFER, vertexCount * 3 * sizeof(float), vertices, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, vertexCount * 3 * sizeof(float),
+                 vertices, GL_STATIC_DRAW);
     glEnableVertexAttribArray(positionHandle);
     glVertexAttribPointer(positionHandle, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
 
-    // Log first vertex for debugging
-    if (vertices && vertexCount > 0) {
-        LOGI("First vertex: (%.2f, %.2f, %.2f)",
-             vertices[0], vertices[1], vertices[2]);
-    }
-
     // Upload texture coordinates
     glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
-    glBufferData(GL_ARRAY_BUFFER, vertexCount * 2 * sizeof(float), texCoords, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, vertexCount * 2 * sizeof(float),
+                 texCoords, GL_STATIC_DRAW);
     glEnableVertexAttribArray(texCoordHandle);
     glVertexAttribPointer(texCoordHandle, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
 
-    // Calculate final MVP matrix
-    float tempMVP[16];
-    Matrix::multiplyMM(tempMVP, 0, mvpMatrix, 0, modelMatrix, 0);
-
-    logMatrix("Final MVP Matrix", tempMVP);
-
-    // Set MVP matrix uniform
-    glUniformMatrix4fv(mvpMatrixHandle, 1, GL_FALSE, tempMVP);
+    // Set MVP matrix uniform using GLM
+    glUniformMatrix4fv(mvpMatrixHandle, 1, GL_FALSE, glm::value_ptr(finalMVP));
 
     // Draw triangles
     glDrawArrays(GL_TRIANGLES, 0, vertexCount);
