@@ -1,8 +1,8 @@
 package com.example.opengljava;
 
 public class Triangle extends Shape {
-    private static final String VERTEX_SHADER_PATH = "shaders/triangle.vert";
-    private static final String FRAGMENT_SHADER_PATH = "shaders/triangle.frag";
+    private static final String VERTEX_SHADER_PATH = "color_vertex.glsl";
+    private static final String FRAGMENT_SHADER_PATH = "color_fragment.glsl";
 
     private Triangle(Builder builder) {
         super(builder);

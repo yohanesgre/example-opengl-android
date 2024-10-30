@@ -9,6 +9,8 @@
 #include <GLES2/gl2.h>
 #include <string>
 #include <map>
+#include <android/asset_manager.h>
+#include <android/asset_manager_jni.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -16,6 +18,7 @@
 class Renderer {
 public:
     void init();
+    void setAssetManager(AAssetManager* mgr);
     void setupView(int width, int height);
     GLuint getOrCreateShaderProgram(const std::string& vertexPath, const std::string& fragmentPath);
     void drawShape(const std::string& programName,
@@ -26,8 +29,11 @@ public:
                    float rotationAngle, float rotationX, float rotationY, float rotationZ);
 
 private:
+    AAssetManager* assetManager;
+    std::string loadFileContents(const std::string& filePath);
     GLuint loadShader(GLenum type, const char* source);
     std::map<std::string, GLuint> shaderPrograms;
+
 
     // Replace float arrays with GLM matrices
     glm::mat4 projectionMatrix;

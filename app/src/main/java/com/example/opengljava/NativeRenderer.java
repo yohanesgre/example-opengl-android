@@ -1,5 +1,7 @@
 package com.example.opengljava;
 
+import android.content.Context;
+import android.content.res.AssetManager;
 import android.util.Log;
 
 public class NativeRenderer {
@@ -16,7 +18,7 @@ public class NativeRenderer {
         }
     }
 
-    public native void init();
+    public native void init(AssetManager assetManager);
     public native void setupView(int width, int height);
     public native void cleanup();
     public native void drawShape(
@@ -30,9 +32,9 @@ public class NativeRenderer {
             float rotationX, float rotationY, float rotationZ
     );
 
-    public void initialize() {
+    public void initialize(AssetManager assetManager) {
         try {
-            init();
+            init(assetManager);
             isInitialized = true;
             Log.i(TAG, "Renderer initialized successfully");
         } catch (Exception e) {

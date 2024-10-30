@@ -7,6 +7,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <android/asset_manager_jni.h>
 
 #define LOG_TAG "JNIBridge"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
@@ -97,7 +98,7 @@ static bool validateTransformParams(float scaleX, float scaleY, float scaleZ,
 extern "C" {
 
 JNIEXPORT void JNICALL
-Java_com_example_opengljava_NativeRenderer_init(JNIEnv* env, jobject /* obj */) {
+Java_com_example_opengljava_NativeRenderer_init(JNIEnv* env, jobject /* obj */, jobject assetManager) {
     try {
         if (!renderer) {
             renderer = std::make_unique<Renderer>();
@@ -107,6 +108,10 @@ Java_com_example_opengljava_NativeRenderer_init(JNIEnv* env, jobject /* obj */) 
         } else {
             LOGI("Renderer already initialized");
         }
+
+        // Convert Java AssetManager to native AAssetManager
+        AAssetManager* nativeManager = AAssetManager_fromJava(env, assetManager);
+        renderer->setAssetManager(nativeManager);
     } catch (const std::exception& e) {
         LOGE("Error in init: %s", e.what());
         renderer.reset();

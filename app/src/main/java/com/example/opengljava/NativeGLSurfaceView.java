@@ -18,7 +18,7 @@ public class NativeGLSurfaceView extends GLSurfaceView {
         try {
             // Initialize native renderer
             nativeRenderer = new NativeRenderer();
-            renderer = new NativeGLRenderer(nativeRenderer);
+            renderer = new NativeGLRenderer(nativeRenderer, context.getAssets());
 
             // Set the Renderer for drawing on the GLSurfaceView
             setRenderer(renderer);

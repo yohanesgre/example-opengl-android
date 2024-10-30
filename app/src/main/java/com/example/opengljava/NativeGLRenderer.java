@@ -1,5 +1,6 @@
 package com.example.opengljava;
 
+import android.content.res.AssetManager;
 import android.opengl.GLSurfaceView;
 import android.opengl.Matrix;
 import android.os.SystemClock;
@@ -13,20 +14,27 @@ public class NativeGLRenderer implements GLSurfaceView.Renderer {
     private final NativeRenderer nativeRenderer;
     private final Triangle triangle;
     private boolean isInitialized = false;
+    private final AssetManager assetManager;
 
-    public NativeGLRenderer(NativeRenderer nativeRenderer) {
+    public NativeGLRenderer(NativeRenderer nativeRenderer, AssetManager assetManager) {
         if (nativeRenderer == null) {
             throw new IllegalArgumentException("NativeRenderer cannot be null");
         }
         this.nativeRenderer = nativeRenderer;
-        this.triangle = new Triangle.Builder().scale(1f,1f, 1f).build();
+
+        if (assetManager == null) {
+            throw new IllegalArgumentException("AssetManager cannot be null");
+        }
+        this.assetManager = assetManager;
+
+        this.triangle = new Triangle.Builder().scale(1f, 1f, 1f).build();
         Log.i(TAG, "NativeGLRenderer created");
     }
 
     @Override
     public void onSurfaceCreated(GL10 gl, EGLConfig config) {
         try {
-            nativeRenderer.initialize();
+            nativeRenderer.initialize(assetManager);
             isInitialized = true;
             Log.i(TAG, "Surface created and renderer initialized");
         } catch (Exception e) {
@@ -40,7 +48,7 @@ public class NativeGLRenderer implements GLSurfaceView.Renderer {
         try {
             if (!isInitialized) {
                 Log.w(TAG, "Renderer not initialized, attempting to initialize");
-                nativeRenderer.initialize();
+                nativeRenderer.initialize(assetManager);
                 isInitialized = true;
             }
             nativeRenderer.updateView(width, height);

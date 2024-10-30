@@ -5,7 +5,12 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/string_cast.hpp>
+#include <android/asset_manager.h>
+#include <android/asset_manager_jni.h>
 
+#ifndef SHADER_DIR
+#define SHADER_DIR "shaders"  // fallback if not defined by CMake
+#endif
 #define LOG_TAG "NativeRenderer"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
@@ -51,6 +56,33 @@ void Renderer::init() {
     LOGI("Renderer initialized");
 }
 
+void Renderer::setAssetManager(AAssetManager* mgr) {
+    assetManager = mgr;
+}
+
+std::string Renderer::loadFileContents(const std::string& filePath) {
+    std::string fullPath = "shaders/" + filePath;
+    AAsset* asset = AAssetManager_open(assetManager, fullPath.c_str(), AASSET_MODE_BUFFER);
+
+    if (!asset) {
+        LOGE("Failed to open asset: %s", fullPath.c_str());
+        return "";
+    }
+
+    // Get the file length
+    off_t length = AAsset_getLength(asset);
+
+    // Read the file content
+    std::string content;
+    content.resize(length);
+    AAsset_read(asset, &content[0], length);
+
+    // Close the asset
+    AAsset_close(asset);
+
+    return content;
+}
+
 GLuint Renderer::loadShader(GLenum type, const char* source) {
     GLuint shader = glCreateShader(type);
     if (shader == 0) {
@@ -73,29 +105,17 @@ GLuint Renderer::getOrCreateShaderProgram(const std::string& vertexPath,
         return it->second;
     }
 
-    const char* vertexShaderSource =
-            "uniform mat4 uMVPMatrix;\n"
-            "attribute vec4 vPosition;\n"
-            "attribute vec2 texCoord;\n"
-            "varying vec2 uv;\n"
-            "void main() {\n"
-            "    gl_Position = uMVPMatrix * vPosition;\n"
-            "    uv = texCoord;\n"
-            "}\n";
+    // Load shader sources from files
+    std::string vertexShaderSource = loadFileContents(vertexPath);
+    std::string fragmentShaderSource = loadFileContents(fragmentPath);
 
-    const char* fragmentShaderSource =
-            "precision mediump float;\n"
-            "varying vec2 uv;\n"
-            "void main() {\n"
-            "    vec3 barycentric = vec3(1.0 - uv.x - uv.y, uv.x, uv.y);\n"
-            "    vec3 color = barycentric.x * vec3(1.0, 0.0, 0.0) +\n"
-            "                 barycentric.y * vec3(0.0, 1.0, 0.0) +\n"
-            "                 barycentric.z * vec3(0.0, 0.0, 1.0);\n"
-            "    gl_FragColor = vec4(color, 1.0);\n"
-            "}\n";
+    if (vertexShaderSource.empty() || fragmentShaderSource.empty()) {
+        LOGE("Failed to load shader sources");
+        return 0;
+    }
 
-    GLuint vertexShader = loadShader(GL_VERTEX_SHADER, vertexShaderSource);
-    GLuint fragmentShader = loadShader(GL_FRAGMENT_SHADER, fragmentShaderSource);
+    GLuint vertexShader = loadShader(GL_VERTEX_SHADER, vertexShaderSource.c_str());
+    GLuint fragmentShader = loadShader(GL_FRAGMENT_SHADER, fragmentShaderSource.c_str());
 
     if (!vertexShader || !fragmentShader) {
         LOGE("Failed to create shaders");
@@ -181,24 +201,15 @@ void Renderer::drawShape(const std::string& programName,
     }
     center /= static_cast<float>(vertexCount);
 
-    // Build model matrix using GLM
-    glm::mat4 model = glm::mat4(1.0f);
+    // Start with the input model matrix
+    glm::mat4 model = glm::make_mat4(modelMatrix);
 
-    // Extract translation from input model matrix
-    glm::vec3 translation(modelMatrix[12], modelMatrix[13], modelMatrix[14]);
-
-    // Order of transformations:
-    // 1. Translate to origin (center)
-    // 2. Rotate
-    // 3. Scale
-    // 4. Translate back
-    model = glm::translate(model, translation);                                    // Final position
-    model = glm::translate(model, center);                                        // Move back from origin
-    model = glm::scale(model, glm::vec3(scaleX, scaleY, scaleZ));               // Apply scale
-    model = glm::rotate(model,
-                        glm::radians(rotationAngle),
-                        glm::normalize(glm::vec3(rotationX, rotationY, rotationZ))); // Apply rotation
-    model = glm::translate(model, -center);                                       // Move to origin
+// Apply transformations around center point
+    model = glm::translate(model, center);                    // Move back from origin
+    model = glm::scale(model, glm::vec3(scaleX, scaleY, scaleZ));
+    model = glm::rotate(model, glm::radians(rotationAngle),
+                        glm::normalize(glm::vec3(rotationX, rotationY, rotationZ)));
+    model = glm::translate(model, -center);                   // Move to origin
 
     logMatrix("Model Matrix", model);
 
